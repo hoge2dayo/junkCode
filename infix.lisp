@@ -2,18 +2,18 @@
 
 ;;(require )
 
-(provide :math-expression)
+(provide :infix)
 
-(defpackage :math-expression (:use :common-lisp))
+(defpackage :infix (:use :common-lisp))
 
-(in-package :math-expression)
+(in-package :infix)
 
-(export '(me
+(export '(inn
           )
         ) ;export
 
 ;;;; 
-;;;; ■me マクロ
+;;;; ■inn マクロ
 ;;;; 
 ;;;; 中置記法（生活上一般に使用されいる数式の記法）の数式を記述可能にする。
 ;;;; 中置記法の中に Lisp 式を含めたい場合、関数クォート（#'）を使用する。
@@ -367,8 +367,8 @@
     ) ;let*
   )
 
-;;; 中置記法の数式
-;;; @param infix
-(defmacro me (&body infix)
+;;; 中置記法の数式を評価
+;;; @param infix 中置記法の式
+(defmacro inn (&body infix)
   (infix-to-sexp infix)
   )
