@@ -361,6 +361,99 @@
     ) ;let*
   )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;; 
+
+;;; 書式指定文字列の１文字目と続く数値（ある場合）を取得（多値）
+;;; @param fmt
+;;; @return
+;;; 	[0]:１文字目
+;;; 	[1]:数値
+(defun fmt-ch-scale (fmt)
+  (let ((ch nil)
+        (scale nil)
+        )
+    (setf ch (and (< 0 (length fmt)) (char fmt 0)))
+    (when (and (<= 2 (length fmt)) (char<= #\0 (char fmt 1) #\9))
+      (setf scale (parse-integer fmt :start 1 :junk-allowed t))
+      ) ;when
+    
+    (values ch scale)
+    ) ;let
+  )
+
+;;; 整数を２の補数で表現したbitパターンをマスクする最小の値
+;;; @param n
+;;; @param &optional bits-min 値のbit幅が小さくても最小限確保するbit数
+;;; @return 引数の値をマスクする最小の値（8bit単位）。
+;;; 	#b1...1 LSB
+(defun bit-mask-min (n &optional (bits-min 32))
+  (let ((bits (max bits-min (1+ (integer-length n))))
+		)
+	;; 8bit単位で切り上げ
+	(setf bits (* 8 (ceiling bits 8)))
+	(1- (expt 2 bits))
+	) ;let
+  )
+
+;;; 浮動小数点数文字列から、整数部分の位置を取得
+;;; @param fstr "nnn.ddd" 形式の浮動小数点数文字列
+;;; @return 整数部分の index 範囲を示すリスト
+(defun extract-int-in-float (fstr)
+  (let ((pos-period (or (position #\. fstr) (length fstr)))
+        (pos-num (position-if #'digit-char-p fstr))
+        )
+    (and pos-num (< pos-num pos-period) (list pos-num pos-period))
+    ) ;let
+  )
+
+
+;;; 文字列の右端から３桁ごとにカンマを挿入した文字列を作成
+;;; @param str-src
+;;; @return 
+(defun separate-with-comma (str-src)
+  (do* ((len-src (length str-src))
+        (len-dst (+ len-src (truncate (1- len-src) 3)))
+        (str-dst #+xyzzy(make-vector len-dst :element-type 'character)
+                 #-xyzzy(make-string len-dst)
+                 )
+        (idx-src len-src)
+        (idx-dst len-dst)
+        (cnt 0)
+        )
+       ((<= idx-dst 0) str-dst)
+    (setf (char str-dst (decf idx-dst))
+          (if (< 0 (rem (incf cnt) 4)) (char str-src (decf idx-src)) #\,)
+          ) ;setf
+    ) ;do*
+  )
+
+;;; 整数部分をカンマ区切りした浮動小数点数文字列を作成
+;;; @param f 浮動小数点数
+;;; @param sc 小数点以下の桁数
+;;; @param &optional separate 整数部をカンマ区切りにするかどうか
+;;; @return
+(defun float-string-cs (f sc &optional (separate nil))
+  (let* ((fstr (format nil "~,vf" sc f))
+         range-int
+         )
+    ;; 小数点以下の桁数が 0 の時、小数点を削除
+    (when (eql sc 0) ;nilの場合があるので zerop は使わない
+      (setf fstr (subseq fstr 0 (position #\. fstr :from-end t)))
+      )
+    
+    (when (and separate (setf range-int (extract-int-in-float fstr)))
+      ;; 整数部をカンマ区切りにする
+      (setf fstr (format nil "~a~a~a"
+                         (subseq fstr 0 (car range-int))
+                         (separate-with-comma (subseq fstr (car range-int) (cadr range-int)))
+                         (subseq fstr (cadr range-int))
+                         ) ;format
+            ) ;setf
+      ) ;when
+    fstr
+    ) ;let*
+  )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;
@@ -383,16 +476,71 @@
   )
 
 ;;; オブジェクトの文字列表現を取得
-;;; @param obj 文字列表現にするオブジェクト（ integer ）
+;;; @param i 文字列表現にするオブジェクト（ integer ）
 ;;; @param &optional fmt 書式指定文字列
 ;;; @return 文字列
-(defmethod to-string ((obj integer) &optional (fmt nil))
-  (let ((ch (and (< 0 (length fmt)) (char fmt 0)))
-        )
+(defmethod to-string ((i integer) &optional (fmt nil))
+  (let (ch sc s)
+    (multiple-value-setq (ch sc) (fmt-ch-scale fmt))
+
     (case ch
-     ((#\C #\c) (format nil "\\~:d" obj))
-     (t (format nil "~a" obj))
-     ) ;case
+      ((#\C #\c)
+       ;; 精度指定子がある場合に小数点以下を出力
+       (format nil "\\~:d~[~:;.~:*~v,,,'0a~]" i (or sc 0) "")
+       )
+      ((#\D #\d)
+       (format nil "~a~v,'0d" (if (< i 0) "-" "") sc (abs i))
+       )
+      ((#\N #\n)
+       (setf sc (or sc 2))
+       ;; 精度指定子がある場合に小数点以下を出力
+       (format nil "~:d~[~:;.~:*~v,,,'0a~]" i (or sc 0) "")
+       )
+      ((#\X #\x)
+       ;; 大文字小文字を書式指定文字列と合わせる為のフォーマット切替
+       (setf fmt2 (if (eql ch #\X) "~:@(~v,'0x~)" "~(~v,'0x~)"))
+       
+       (when (< i 0)
+         ;; 負の場合、２の補数表現をした正の値にする
+         (setf i (logand (bit-mask-min i) i))
+         )
+       (format nil fmt2 sc i)
+       )
+      (t (format nil "~a" i)
+         )
+      ) ;case
+    ) ;let
+  )
+
+;;; オブジェクトの文字列表現を取得
+;;; @param f 文字列表現にするオブジェクト（ float ）
+;;; @param &optional fmt 書式指定文字列
+;;; @return 文字列
+(defmethod to-string ((f float) &optional (fmt nil))
+  (let (ch sc fmt2 s1)
+    (multiple-value-setq (ch sc) (fmt-ch-scale fmt))
+
+    (case ch
+      ((#\C #\c)
+       (setf sc (or sc 0))
+       (format nil "\\~a" (float-string-cs f sc t))
+       )
+      ((#\E #\e)
+       (setf sc (or sc 6)
+             ;; 大文字小文字を書式指定文字列と合わせる為のフォーマット切替
+             fmt2 (if (eql ch #\E) "~:@(~,v,3e~)" "~(~,v,3e~)")
+             ) ;setf
+       (format nil fmt2 sc f)
+       )
+      ((#\F #\f) (float-string-cs f sc)
+       )
+      ((#\N #\n)
+       (setf sc (or sc 2))
+       (float-string-cs f sc t)
+       )
+      (t (format nil "~a" f)
+         )
+      ) ;case
     ) ;let
   )
 
