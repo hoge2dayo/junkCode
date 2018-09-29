@@ -432,9 +432,10 @@
 ;;; @param f 浮動小数点数
 ;;; @param sc 小数点以下の桁数
 ;;; @param &optional separate 整数部をカンマ区切りにするかどうか
+;;; @param &optional shift 指定した場合 10^shift 倍の値を出力する
 ;;; @return
-(defun float-string-cs (f sc &optional (separate nil))
-  (let* ((fstr (format nil "~,vf" sc f))
+(defun float-string-cs (f sc &optional (separate nil) (shift nil))
+  (let* ((fstr (format nil "~,v,vf" sc shift f))
          range-int
          )
     ;; 小数点以下の桁数が 0 の時、小数点を削除
@@ -496,6 +497,11 @@
        ;; 精度指定子がある場合に小数点以下を出力
        (format nil "~:d~[~:;.~:*~v,,,'0a~]" i (or sc 0) "")
        )
+      ((#\P #\p)
+       (setf sc (or sc 2))
+       ;; 精度指定子がある場合に小数点以下を出力
+       (format nil "~:d~[~:;.~:*~v,,,'0a~]%" (* 100 i) (or sc 0) "")
+       )
       ((#\X #\x)
        ;; 大文字小文字を書式指定文字列と合わせる為のフォーマット切替
        (setf fmt2 (if (eql ch #\X) "~:@(~v,'0x~)" "~(~v,'0x~)"))
@@ -537,6 +543,10 @@
       ((#\N #\n)
        (setf sc (or sc 2))
        (float-string-cs f sc t)
+       )
+      ((#\P #\p)
+       (setf sc (or sc 2))
+       (format nil "~a%" (float-string-cs f sc t 2))
        )
       (t (format nil "~a" f)
          )
