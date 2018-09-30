@@ -586,6 +586,10 @@
        ;; 精度指定子がある場合に小数点以下を出力
        (format nil "~:d~[~:;.~:*~v,,,'0a~]%" (* 100 i) (or sc 0) "")
        )
+      ((#\R #\r)
+       ;; Lisp での print-read 同一性
+       (format nil "~s" i)
+       )
       ((#\X #\x)
        ;; 大文字小文字を書式指定文字列と合わせる為のフォーマット切替
        (setf fmt2 (if (upper-case-p ch) "~:@(~v,'0x~)" "~(~v,'0x~)"))
@@ -654,6 +658,10 @@
       ((#\P #\p)
        (setf sc (or sc 2))
        (format nil "~a%" (float-string-cs f sc t 2))
+       )
+      ((#\R #\r)
+       ;; Lisp での print-read 同一性
+       (format nil "~s" f)
        )
       (t (format nil "~a" f)
          )
