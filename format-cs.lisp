@@ -170,21 +170,27 @@
                                        (find last-ch "{}")
                                        ) ;values
                      )
-                  (case ch
-                    ((#\{ #\}) (when (eql last-ch ch)
-                                 (princ ch os)
-                                 (setf ch nil) ;last-ch クリアの為
-                                 ) ;when
-                     )
-                    (t (when (find last-ch "{}")
-                         (return (values (1- (funcall fnc-read :index)) ;文字の読込時に+1されているので-1
-                                         last-ch
-                                         ) ;values
-                                 ) ;return
-                         ) ;when
-                       (princ ch os)
-                       )
-                    ) ;case
+                  (cond
+                   ;; {{ または }} か？
+                   ((and (find ch "{}") (eql last-ch ch))
+                    (princ ch os)
+                    (setf ch nil) ;last-ch クリアの為
+                    )
+                   ;; 単独の { または }
+                   ((find last-ch "{}")
+                    (return (values (1- (funcall fnc-read :index)) ;文字の読込時に+1されているので-1
+                                    last-ch
+                                    ) ;values
+                            ) ;return
+                    )
+                   ;; { または } の１文字目は何もしない
+                   ((find ch "{}")
+                    )
+                   ;;
+                   (t
+                    (princ ch os)
+                    )
+                   ) ;cond
                   ) ;do
               ) ;multiple-value-setq
             ) ;with-output-to-string
@@ -428,7 +434,7 @@
     ) ;do*
   )
 
-;;; 整数部分をカンマ区切りした浮動小数点数文字列を作成
+;;; 固定小数点数文字列を作成
 ;;; @param f 浮動小数点数
 ;;; @param sc 小数点以下の桁数
 ;;; @param &optional separate 整数部をカンマ区切りにするかどうか
@@ -453,6 +459,81 @@
             ) ;setf
       ) ;when
     fstr
+    ) ;let*
+  )
+
+;;; 浮動小数点数文字列から、小数部分の位置を取得
+;;; @param fstr "i.ddde+nnn" 形式の浮動小数点数文字列
+;;; @return ピリオドを含む小数部分の index 範囲を示すリスト
+(defun extract-dec-in-float (fstr)
+  (let (pos-period
+        pos-dec-end
+        )
+    (and
+     (setf pos-period (position #\. fstr))
+     (setf pos-dec-end (or (position-if-not #'digit-char-p fstr :start (1+ pos-period))
+                           (length fstr)
+                           ) ;or
+           ) ;setf
+     
+     (list pos-period pos-dec-end)
+     ) ;and
+    ) ;let
+  )
+
+;;; 指数形式の浮動小数点数文字列を作成
+;;; 小数部末尾の0は省略される
+;;; @param f
+;;; @param sc 整数部をも含む桁数。1以上
+;;; @param echr 指数表記前の文字
+;;; @return 
+(defun exp-float-string-cs-for-g (f sc &optional (echr #\E))
+  (let* ((fstr (format nil "~,v,2,,,,ve" (1- sc) echr f))
+         range-dec
+         str-dec
+         )
+    (and
+     (setf range-dec (extract-dec-in-float fstr))
+     (setf str-dec (string-right-trim "0" (subseq fstr (car range-dec) (cadr range-dec))))
+     (format nil "~a~a~a"
+             (subseq fstr 0 (car range-dec))
+             (if (<= (length str-dec) 1) "" str-dec) ;ピリオドのみの場合ピリオドもなくす
+             (subseq fstr (cadr range-dec))
+             ) ;format
+     ) ;and
+    ) ;let*
+  )
+
+;;; 整数から浮動小数点数文字列を作成
+;;; @param i 整数
+;;; @param sc 精度。0の場合19が使用される
+;;; @param &optional echr 指数表記前の文字
+;;; @return 
+(defun exp-float-string-cs-from-int (i sc &optional (echr #\E))
+  (let* ((a (abs i))
+         (n (1+ (truncate (log a 10)))) ;桁数
+         )
+    (when (zerop (or sc 0))
+      (setf sc 19) ;Int64のデフォルト精度
+      ) ;when
+    
+    (cond
+     ((< sc  n)
+      ;; 四捨五入の為の加算
+      (incf a (* 5 (expt 10 (- n sc 1))))
+      
+      (setf s (subseq (format nil "~a" a) 0 sc))
+      (setf s (string-right-trim "0" s))
+      
+      (format nil "~a~[~;~a~:;~a.~]~a~a+~2,'0d"
+              (if (< i 0) "-" "")
+              (length s) (char s 0) (subseq s 1)
+              echr (1- n)
+              ) ;format
+      )
+     (t (format nil "~a" i))
+     ) ;cond
+    
     ) ;let*
   )
 
@@ -492,6 +573,9 @@
       ((#\D #\d)
        (format nil "~a~v,'0d" (if (< i 0) "-" "") sc (abs i))
        )
+      ((#\G #\g)
+       (exp-float-string-cs-from-int i sc (if (upper-case-p ch) #\E #\e))
+       )
       ((#\N #\n)
        (setf sc (or sc 2))
        ;; 精度指定子がある場合に小数点以下を出力
@@ -504,7 +588,7 @@
        )
       ((#\X #\x)
        ;; 大文字小文字を書式指定文字列と合わせる為のフォーマット切替
-       (setf fmt2 (if (eql ch #\X) "~:@(~v,'0x~)" "~(~v,'0x~)"))
+       (setf fmt2 (if (upper-case-p ch) "~:@(~v,'0x~)" "~(~v,'0x~)"))
        
        (when (< i 0)
          ;; 負の場合、２の補数表現をした正の値にする
@@ -523,7 +607,7 @@
 ;;; @param &optional fmt 書式指定文字列
 ;;; @return 文字列
 (defmethod to-string ((f float) &optional (fmt nil))
-  (let (ch sc fmt2 s1)
+  (let (ch sc fmt2 s1 n)
     (multiple-value-setq (ch sc) (fmt-ch-scale fmt))
 
     (case ch
@@ -534,11 +618,34 @@
       ((#\E #\e)
        (setf sc (or sc 6)
              ;; 大文字小文字を書式指定文字列と合わせる為のフォーマット切替
-             fmt2 (if (eql ch #\E) "~:@(~,v,3e~)" "~(~,v,3e~)")
+             fmt2 (if (upper-case-p ch) "~,v,3,,,,'Ee" "~,v,3,,,,'ee")
              ) ;setf
        (format nil fmt2 sc f)
        )
       ((#\F #\f) (float-string-cs f sc)
+       )
+      ((#\G #\g)
+       (when (zerop (or sc 0))
+         (setf sc (cond
+                   ((or (typep f 'long-float) (typep f 'double-float)) 15)
+                   (t 7) ;short-float または single-float
+                   ) ;cond
+               ) ;setf
+         ) ;when
+       
+       (cond
+        ;; 指数が-5以下あるいは精度指定子以上の場合は指数表記
+        ((or (< (abs f) (expt 10 -4)) (<= (expt 10 sc) (abs f)))
+         ;; 大文字小文字を書式指定文字列と合わせる
+         (exp-float-string-cs-for-g f sc (if (upper-case-p ch) #\E #\e))
+         )
+        (t
+         ;; G/g では精度指定子は整数部と小数部の両方桁数合計
+         (setf n (1+ (truncate (log (abs f) 10)))) ;整数部の桁数
+         ;; 固定小数点表記
+         (float-string-cs f (- sc n))
+         )
+        ) ;cond
        )
       ((#\N #\n)
        (setf sc (or sc 2))
