@@ -51,43 +51,6 @@
     ) ;let
   )
 
-;;; 文字列を１文字ずつ読み取るクロージャを作成
-;;; @param str 読み取る文字列
-;;; @param &optional index 最初の読取位置
-;;; @return クロージャ
-;;; 	クロージャの引数：
-;;; 		なし   : １文字読み取り次の位置へ進める
-;;; 		:peek  : １文字読み取るが位置は進めない
-;;; 		:index : 読取位置を取得
-;;; 		整数   : 読取位置のセット
-(defun reader-string (str &optional (index 0))
-  (let ((len (length str))
-        (idx index)
-        )
-    #'(lambda (&optional mode-or-idx)
-        (case mode-or-idx
-          ((nil) (and (<= 0 idx)
-                      (< idx len)
-                      (prog1 (char str idx) (incf idx))
-                      ) ;and
-           )
-          (:peek (and (<= 0 idx)
-                      (< idx len)
-                      (char str idx)
-                      ) ;and
-           )
-          (:index idx
-           )
-          ;; 整数であること
-          (t (when (numberp mode-or-idx)
-               (setf idx mode-or-idx)
-               ) ;when
-             )
-          ) ;case
-        ) ;lambda
-    ) ;let
-  )
-
 ;;; 指定文字あるいは文字列と一致するか
 ;;; @param str
 ;;; @param val
@@ -97,18 +60,15 @@
 ;;; 	[1]:一致直後の位置
 ;;; 	[2]:引数strで一致した部分
 (defun read-const (str val start)
-  (cond
-   ((characterp val) (values (char= (char str start) val)
-                             (1+ start)
-                             val
-                             ) ;values
-    )
-   ((stringp val) (values (string-equal str val :start1 start :end1 (+ start (length val)))
-                          (+ start (length val))
-                          (subseq str start (+ start (length val)))
-                          ) ;values
-    )
-   ) ;cond
+  (let* ((end (+ start (length val)))
+         )
+    (when (<= 0 start end (length str))
+      (values (string-equal str val :start1 start :end1 end)
+              end
+              (subseq str start end)
+              ) ;values
+      ) ;when
+    ) ;let*
   )
 
 ;;; 文字列から整数を読み取る
@@ -129,9 +89,7 @@
       ) ;when
 
     ;; 数字の終焉を検索
-    (setf end-n (or (position-if-not #'(lambda (ch) (char<= #\0 ch #\9))
-                                     str :start start-n
-                                     ) ;position-if-not
+    (setf end-n (or (position-if-not #'digit-char-p str :start start-n)
                     len
                     ) ;or
           ) ;setf
@@ -145,6 +103,34 @@
     ) ;let*
   )
 
+;;; string-output-stream にアクセスするクロージャを作成
+;;; @return クロージャ
+;;; 	クロージャの引数：
+;;; 		あり   : 内部の stream へ出力
+;;; 		なし   : stream に蓄積した内容を文字列で返す
+(defun writer-string ()
+  (let ((stream (make-string-output-stream))
+        )
+    #'(lambda (&optional (val nil val-p))
+        (if val-p
+            (princ val stream)
+          (get-output-stream-string stream)
+          ) ;if
+        ) ;lambda
+    )
+  )
+
+;;;
+;;; @param chs 探す文字が含まれる文字列
+;;; @param str 検索範囲
+;;; @param start 検索開始位置
+;;; @return 
+(defun position-some-char (chs str start)
+  (when (<= 0 start (1- (length str)))
+    (position-if #'(lambda (ch) (find ch chs)) str :start start)
+    ) ;when
+  )
+
 ;;; 中括弧または末尾まで文字列を読み込む。
 ;;; "{{"=>"{", "}}"=>"}"の変換を行う。
 ;;; @param str
@@ -154,57 +140,35 @@
 ;;; 	[1]:文字列を読み込んだ直後の位置
 ;;; 	[2]:読み込んだ文字列
 ;;; 	[3]:文字列読込終了の原因。括弧またはnil（末尾）
-(defun read-cs-string-until-brace (str start)
-  (let ((fnc-read (reader-string str start))
+(defun read-string-until-brace (str start)
+  (let ((fnc-write (writer-string))
         end
-        ch
         read-str
+        ch
         )
-    (setf read-str
-          (with-output-to-string (os)
-            (multiple-value-setq (end ch)
-                (do ((last-ch nil ch)
-                     (ch (funcall fnc-read) (funcall fnc-read))
-                     )
-                    ((null ch) (values (funcall fnc-read :index)
-                                       (find last-ch "{}")
-                                       ) ;values
-                     )
-                  (cond
-                   ;; {{ または }} か？
-                   ((and (find ch "{}") (eql last-ch ch))
-                    (princ ch os)
-                    (setf ch nil) ;last-ch クリアの為
-                    )
-                   ;; 単独の { または }
-                   ((find last-ch "{}")
-                    (return (values (1- (funcall fnc-read :index)) ;文字の読込時に+1されているので-1
-                                    last-ch
-                                    ) ;values
-                            ) ;return
-                    )
-                   ;; { または } の１文字目は何もしない
-                   ((find ch "{}")
-                    )
-                   ;;
-                   (t
-                    (princ ch os)
-                    )
-                   ) ;cond
-                  ) ;do
-              ) ;multiple-value-setq
-            ) ;with-output-to-string
-          ) ;setf
-    
-    ;; index は括弧読み込み前の位置に修正
-    (when ch (decf end))
-    
-    ;; 必ず真である点に注意
-    (values t
-            end
-            read-str
-            ch
-            ) ;values
+    (do* ((start-s start (+ end-s 2)) ;ループ継続＝同じ文字が２連続だった。なので+2
+          (end-s)
+          )
+         (nil)
+      ;; { または } までを出力
+      (setf end-s (position-some-char "{}" str start-s))
+      (funcall fnc-write (subseq str start-s end-s))
+      
+      (when (or (null end-s)                                    ;文字列末尾に到達
+                (<= (1- (length str)) end-s)                    ;最後の文字（２連続はあり得ない）
+                (char/= (char str end-s) (char str (1+ end-s))) ;２連続でない
+                ) ;or
+        (return (values t
+                        (or end-s (length str))
+                        (funcall fnc-write)
+                        (and end-s (char str end-s))
+                        ) ;values
+                ) ;return
+        ) ;when
+      
+      ;; { または } の２連続だったので１文字出力
+      (funcall fnc-write (char str end-s))
+      ) ;do*
     ) ;let
   )
 
@@ -238,7 +202,7 @@
      ;; format string
      (if (multiple-value-set-if (start) (read-const str ":" start))
          (and
-          (multiple-value-set-if (start fmtstr ch) (read-cs-string-until-brace str start))
+          (multiple-value-set-if (start fmtstr ch) (read-string-until-brace str start))
           (eql ch #\})
           (incf start)
           ) ;and
@@ -271,7 +235,7 @@
          )
         ((<= len start) (reverse result))
       
-      (multiple-value-set-if (start read-str ch) (read-cs-string-until-brace str start))
+      (multiple-value-set-if (start read-str ch) (read-string-until-brace str start))
       (when (eql ch #\})
         (error "複合書式指定文字列が異常です。")
         ) ;when
@@ -350,11 +314,7 @@
       ;; align が設定されていて、文字列の長さが align の絶対値より短い場合
       ;; align が正の場合右揃え。負の場合左揃え。
       (setf str
-            (replace (fill #+xyzzy(make-vector (abs align) :element-type 'character)
-                           #-xyzzy(make-string (abs align))
-                           #\Space
-                           ) ;fill
-                     str
+            (replace (fill (make-string (abs align)) #\Space) str
                      :start1 (if (< 0 align)
                                  (- align (length str))
                                0
@@ -420,9 +380,7 @@
 (defun separate-with-comma (str-src)
   (do* ((len-src (length str-src))
         (len-dst (+ len-src (truncate (1- len-src) 3)))
-        (str-dst #+xyzzy(make-vector len-dst :element-type 'character)
-                 #-xyzzy(make-string len-dst)
-                 )
+        (str-dst (make-string len-dst))
         (idx-src len-src)
         (idx-dst len-dst)
         (cnt 0)
