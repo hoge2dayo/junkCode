@@ -9,14 +9,12 @@
 
 (in-package :lhtml-user)
 
-(export '(print-parsed-lhtml
-		  print-main-header
-		  print-main-footer
-		  def-lhtml
-		  *register-info*
+(export '(*register-info*
 		  get-info
 		  clear-info
 		  *request*
+		  print-parsed-lhtml
+		  def-lhtml
 		  )
 		)
 
@@ -59,7 +57,6 @@
 ;;; @param parsed-lhtml 関数 parse-lhtml で得た結果
 ;;; @return 
 (defun print-parsed-lhtml-section (section parsed-lhtml)
-  ;; カレントパッケージを変更して出力
   (let* ((lis (getf parsed-lhtml section))
 		 )
 	(dolist (e lis)
@@ -126,6 +123,7 @@
 ;;; @param func-name メイン関数の名前
 ;;; @return 
 (defun print-parsed-lhtml (parsed-lhtml func-name)
+  ;; カレントパッケージを変更して出力
   (let* ((*package* (in-package :lhtml-user))
 		 )
 	;; ---- require
