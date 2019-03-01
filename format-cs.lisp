@@ -518,55 +518,112 @@
   )
 
 ;;; オブジェクトの文字列表現を取得
-;;; @param i 文字列表現にするオブジェクト（ integer ）
+;;; @param obj 文字列表現にするオブジェクト（ real ）
 ;;; @param &optional fmt 書式指定文字列
 ;;; @return 文字列
-(defmethod to-string ((i integer) &optional (fmt nil))
-  (let (ch sc s)
+(defmethod to-string ((n real) &optional (fmt nil))
+  (let (ch sc)
     (multiple-value-setq (ch sc) (fmt-ch-scale fmt))
 
     (case ch
       ((#\C #\c)
-       ;; 通貨	（例）\12,345.68
+       ;; 通貨	（例）-\12,345.68  ※符号が通貨記号より前なので注意
        ;; 整数部はカンマ区切り
        ;; 精度指定子：小数点以下の桁数。デフォルトは0
-       (call-next-method)
+       (format nil "~:[~;-~]\\~a"
+               (< n 0)
+               (float-string-cs (abs n) t (or sc 0) nil)
+               ) ;format
        )
+      ((#\E #\e)
+       ;; 指数	（例）1.234568E+004
+       ;; 指数部は３桁
+       ;; 精度指定子：小数点以下の桁数。デフォルト6。0の時、小数点は出力しない
+       (exponent-string-cs n (or sc 6) nil ch 3)
+       )
+      ((#\F #\f)
+       ;; 固定小数点表記
+       ;; 精度指定子：小数点以下の桁数。デフォルトは2。0の時、小数点は出力しない
+       (float-string-cs n nil (or sc 2) nil)
+       )
+      ((#\G #\g)
+       ;; 精度指定なしあるいは 0 の場合の精度を決定
+       (when (zerop (or sc 0))
+         (setf sc (cond
+                   ((or (typep n 'long-float) (typep n 'double-float)) 15)
+                   (t 7) ;short-float または single-float
+                   ) ;cond
+               ) ;setf
+         ) ;when
+       
+       (cond
+        ;; 整数の場合はＣ＃の decimal と見なして固定小数点表記とする
+        ((typep n 'integer)
+         (format nil "~d" n)
+         )
+        ;; 指数が-5以下の場合は指数表記。この場合四捨五入はしない
+        ((< (abs n) (expt 10 -4))
+         (exponent-string-cs n nil t (if (upper-case-p ch) #\E #\e) 2)
+         )
+        ;; 指数が指定精度以上の場合は指数表記
+        ((<= (expt 10 sc) (abs n))
+         ;; 指定された精度は整数部も含む桁数なので、-1 する
+         (exponent-string-cs n (1- sc) t (if (upper-case-p ch) #\E #\e) 2)
+         )
+        ;; 指数が-5より大きく指定精度未満
+        (t
+         ;; G/g では精度指定子は整数部と小数部の両方桁数合計
+         (let ((isc (1+ (floor (log (abs n) 10)))) ;整数部の桁数
+               )
+           ;; 固定小数点表記
+           (float-string-cs n nil (- sc isc) t)
+           ) ;let
+         )
+        ) ;cond
+       )
+      ((#\N #\n)
+       (float-string-cs n t (or sc 2) nil)
+       )
+      ((#\P #\p)
+       (format nil "~a%" (float-string-cs (* n 100) t (or sc 2) nil))
+       )
+      (t
+       (error "形式指定子が無効です。")
+       )
+      ) ;case
+    ) ;let
+  )
+
+;;; オブジェクトの文字列表現を取得
+;;; @param i 文字列表現にするオブジェクト（ integer ）
+;;; @param &optional fmt 書式指定文字列
+;;; @return 文字列
+(defmethod to-string ((i integer) &optional (fmt nil))
+  (let (ch sc)
+    (multiple-value-setq (ch sc) (fmt-ch-scale fmt))
+
+    (case ch
       ((#\D #\d)
        ;; 整数	（例）00012345
        ;; 精度指定子：数字部分の桁数。桁数が指定以上になるよう0を出力。桁数に符号は含まない。
        (format nil "~a~v,'0d" (if (< i 0) "-" "") sc (abs i))
        )
-      ((#\E #\e)
-       (call-next-method)
-       )
-      ((#\F #\f)
-       (call-next-method)
-       )
-      ((#\G #\g)
-       (call-next-method)
-       )
-      ((#\N #\n)
-       (call-next-method)
-       )
-      ((#\P #\p)
-       (call-next-method)
-       )
-      ((#\R #\r)
-       (call-next-method)
-       )
       ((#\X #\x)
-       ;; 大文字小文字を書式指定文字列と合わせる為のフォーマット切替
-       (setf fmt2 (if (upper-case-p ch) "~:@(~v,'0x~)" "~(~v,'0x~)"))
-       
        (when (< i 0)
          ;; 負の場合、２の補数表現をした正の値にする
          (setf i (logand (bit-mask-min i) i))
          )
-       (format nil fmt2 sc i)
+       ;; 大文字小文字を書式指定文字列と合わせる為のフォーマット切替
+       (format nil (if (upper-case-p ch) "~:@(~v,'0x~)" "~(~v,'0x~)")
+               sc i
+               ) ;format
        )
-      (t (format nil "~a" i)
-         )
+      ((nil)
+       (call-next-method i "G")
+       )
+      (t
+       (call-next-method)
+       )
       ) ;case
     ) ;let
   )
@@ -576,71 +633,23 @@
 ;;; @param &optional fmt 書式指定文字列
 ;;; @return 文字列
 (defmethod to-string ((f float) &optional (fmt nil))
-  (let (ch sc fmt2 s1 n)
+  (let (ch sc)
     (multiple-value-setq (ch sc) (fmt-ch-scale fmt))
 
     (case ch
-      ((#\C #\c)
-       ;; 通貨	（例）-\12,345.68  ※符号が通貨記号より前なので注意
-       ;; 整数部はカンマ区切り
-       ;; 精度指定子：小数点以下の桁数。デフォルトは0
-       (format nil "~:[~;-~]\\~a"
-               (< f 0)
-               (float-string-cs (abs f) t (or sc 0) nil)
-               ) ;format
-       )
-      ((#\E #\e)
-       ;; 指数	（例）1.234568E+004
-       ;; 指数部は３桁
-       ;; 精度指定子：小数点以下の桁数。デフォルト6。0の時、小数点は出力しない
-       (exponent-string-cs f (or sc 6) nil ch 3)
-       )
-      ((#\F #\f)
-       ;; 固定小数点表記
-       ;; 精度指定子：小数点以下の桁数。デフォルトは2。0の時、小数点は出力しない
-       (float-string-cs f nil (or sc 2) nil)
-       )
-      ((#\G #\g)
-       ;; 精度指定なしあるいは 0 の場合の精度を決定
-       (when (zerop (or sc 0))
-         (setf sc (cond
-                   ((or (typep f 'long-float) (typep f 'double-float)) 15)
-                   (t 7) ;short-float または single-float
-                   ) ;cond
-               ) ;setf
-         ) ;when
-       
-       (cond
-        ;; 指数が-5以下の場合は指数表記。この場合四捨五入はしない
-        ((< (abs f) (expt 10 -4))
-         (exponent-string-cs f nil t (if (upper-case-p ch) #\E #\e) 2)
-         )
-        ;; 指数がは精度指定子以上の場合は指数表記
-        ((<= (expt 10 sc) (abs f))
-         ;; 指定された精度は整数部も含む桁数なので、-1 する
-         (exponent-string-cs f (1- sc) t (if (upper-case-p ch) #\E #\e) 2)
-         )
-        ;; 浮動小数点数表記
-        (t
-         ;; G/g では精度指定子は整数部と小数部の両方桁数合計
-         (setf n (1+ (floor (log (abs f) 10)))) ;整数部の桁数
-         ;; 固定小数点表記
-         (float-string-cs f nil (- sc n) t)
-         )
-        ) ;cond
-       )
-      ((#\N #\n)
-       (float-string-cs f t (or sc 2) nil)
-       )
-      ((#\P #\p)
-       (format nil "~a%" (float-string-cs (* f 100) t (or sc 2) nil))
-       )
       ((#\R #\r)
        ;; Lisp での print-read 同一性
        (format nil "~s" f)
        )
-      (t (format nil "~a" f)
-         )
+      ((#\C #\c #\E #\e #\F #\f #\G #\g #\N #\n #\P #\p)
+       (call-next-method)
+       )
+      ((nil)
+       (call-next-method f "G")
+       )
+      (t
+       (call-next-method)
+       )
       ) ;case
     ) ;let
   )
