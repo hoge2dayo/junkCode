@@ -219,10 +219,17 @@
     )
   )
 
+;;; 複合書式指定文字列を解析した結果
+(defstruct parsed-cs-format
+  (lis nil)
+  )
+
 ;;; Ｃ＃のstring.format()などで使用される複合書式指定文字列を読み込む
 ;;; @param str
-;;; @return リスト。パラメータが埋め込まれる部分はリストが要素となる。
-;;; 	要素となるリスト:(<index> <align> <書式指定文字列>)
+;;; @return 構造体 parsed-cs-format。メンバに解析結果のリストがセットされている。
+;;; 	解析結果のリスト：
+;;; 		パラメータが埋め込まれる部分はリストが要素となる。
+;;; 		要素となるリスト:(<index> <align> <書式指定文字列>)
 (defun parse-cs-format-string (str)
   (let ((start 0)
         index
@@ -233,11 +240,11 @@
         )
     (do ((len (length str))
          )
-        ((<= len start) (reverse result))
+        ((<= len start))
       
       (multiple-value-set-if (start read-str ch) (read-string-until-brace str start))
       (when (eql ch #\})
-        (error "複合書式指定文字列が異常です。")
+        (error "複合書式指定文字列が異常です。~%~a~%~@,,va~%" str  start #\^)
         ) ;when
       
       (when (< 0 (length read-str))
@@ -247,40 +254,58 @@
       ;; 書式指定項目
       (when (eql ch #\{)
         (unless (multiple-value-set-if (start index align read-str) (read-cs-item-format str start))
-          (error "書式指定項目が異常です。")
+          (error "書式指定項目が異常です。~%~a~%~@,,va~%" str start #\^)
           ) ;unless
         
         (push (list index align read-str) result)
         ) ;when
-      
       ) ;do
+
+    ;; 構造体に結果をセット
+    (make-parsed-cs-format :lis (reverse result))
     ) ;let
   )
 
 ;;; 書式に従って文字列を出力する。（マクロ）
 ;;; 複合書式指定文字列の変換のみ行い、残りの処理は format-csl で行う。
 ;;; @param stream ストリーム。t は標準出力。nil は文字列として出力。
-;;; @param fmt-string Ｃ＃のstring.Format()などで使用される複合書式指定文字列
+;;; @param fmt Ｃ＃のstring.Format()などで使用される複合書式指定文字列
+;;; 	あるいは関数 parse-cs-format-string で取得した値
 ;;; @param &rest args 書式指定項目の部分に埋め込まれる文字列表現の基になるオブジェクト
-(defmacro format-cs (stream fmt-string &rest args)
+(defmacro format-cs (stream fmt &rest args)
   (cond
-   ;; fmt-string が文字列定数
-   ((stringp fmt-string)
-    `(format-csl ,stream ',(parse-cs-format-string fmt-string) ,@args)
+   ;; fmt が文字列定数
+   ((stringp fmt)
+    `(format-csl ,stream ',(parse-cs-format-string fmt) ,@args)
     )
    (t
-    `(format-csl ,stream (parse-cs-format-string ,fmt-string) ,@args)
+    `(format-csl ,stream ,fmt ,@args)
     )
    ) ;cond
   )
 
 ;;; 書式に従って文字列を出力する。
 ;;; @param stream ストリーム。t は標準出力。nil は文字列として出力。
-;;; @param fmt-list 複合書式指定文字列から関数 parse-cs-format-string で作成したリスト
+;;; @param fmt 複合書式指定文字列、
+;;; 	あるいは関数 parse-cs-format-string で取得した値
 ;;; @param &rest args 書式指定項目の部分に埋め込まれる文字列表現の基になるオブジェクト
-(defun format-csl (stream fmt-list &rest args)
-  (let ((lis-str nil)
+(defun format-csl (stream fmt &rest args)
+  (let (fmt-lis
+        (lis-str nil)
         )
+    (cond
+     ((stringp fmt) (setf fmt (parse-cs-format-string fmt))
+      )
+     ((parsed-cs-format-p fmt)
+      )
+     (t (error "書式として解釈できません。")
+        )
+     ) ;cond
+    
+    (unless (setf fmt-lis (parsed-cs-format-lis fmt))
+      (error "書式データが異常です。")
+      ) ;unless
+    
     (setf lis-str
           (mapcar #'(lambda (e) (cond
                                  ((stringp e) e)
@@ -290,14 +315,13 @@
                                  (t nil)
                                  ) ;cond
                       ) ;lambda
-                  fmt-list
+                  fmt-lis
                   ) ;mapcar
           ) ;setf
     
     (format stream "~{~a~}" lis-str)
     ) ;let
   )
-
 
 ;;; 書式指定文字列に対応する（埋め込む）文字列を作成
 ;;; @param e 書式指定項目を示すリスト。(<index> <align> <書式指定文字列>)
