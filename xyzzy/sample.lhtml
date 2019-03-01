@@ -1,0 +1,67 @@
+@*
+■ lhtml ファイルのサンプル
+　「カガクニュース隊」というサイトの各ページへのリンクを作成
+　（※このサイトと当方は無関係）
+
+　このファイルを require の検索パスに配置しておき、下のフォームを評価。
+
+　　(lhtml:make-html :sample)
+
+　実行すると xyzzy で開始ページが問われるので入力すること。
+　（入力を求められるのは、下に (read-integer ～) があるため）
+　入力する値は任意の正の整数。
+
+　入力後ファイル sample.html が生成される。
+
+　なお、下のように &key 引数 :request を指定して評価すると、
+　開始ページの入力は求められないし、出力するリンク数も変更できる作りとなっている。
+
+　(lhtml:make-html :sample :request '(:start-page 123 :count-page 50))
+
+ *@
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<meta http-equiv="Content-Language" content="ja" />
+	<title>カガクニュース隊 ページリンク</title>
+<style type="text/css">
+<!--
+#header {
+	position : fixed;
+	top : 0;		/*基準を画面の左上に*/
+	left : 0;
+	margin : 0;		/*余白が入らないように*/
+	width : 100%;
+}
+a {
+	display : inline-block;
+	border : solid 2px;
+	border-radius : 4px;
+	border-color : #fff;
+	margin : 3px;
+	padding : 4px;
+	font-weight : bold;
+}
+-->
+</style>
+</head>
+<body>
+<div id="header">
+	<h1>カガクニュース隊 ～ 話題のニュースを見たネットの反応 ～</h1>
+</div>
+<h1>　</h1>
+@{
+(let ((page-start (req :start-page (read-integer "開始ページ：")))
+	  (cnt (req :count-page 100))
+	  page
+	  )
+  (dotimes (i cnt)
+	(setf page (+ page-start i))
+}
+<a href="http://www.scienceplus2ch.com/?p=@(+ page)" target="_blank">@(+ page) ページ</a>
+@{
+   ) ;dotimes
+ ) ;let
+}
+</body>
+</html>
