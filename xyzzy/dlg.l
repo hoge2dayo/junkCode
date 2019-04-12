@@ -19,6 +19,7 @@
 		  create-column-layout
 		  create-row-layout
 		  create-edge-layout
+		  display-dialog
 		  sample-dialog
 		  )
 		)
