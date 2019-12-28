@@ -1,19 +1,40 @@
-;;;; require - provide - defpackage - in-package - export
+;;;; 「 Common Lisp 第２版」（共立出版） p245 より
+;;;; 1. provide
+;;;; (1.5. defpackage)
+;;;; 2. in-package
+;;;; 3. shadow
+;;;; 4. export
+;;;; 5. require
+;;;; 6. use-package
+;;;; 7. import
 
-;;(require )
-
+;;;; 1. provide
 (provide :collector)
 
+;;;; (1.5. defpackage)
 (defpackage :collector (:use :common-lisp))
 
+;;;; 2. in-package
 (in-package :collector)
 
+;;;; 3. shadow
+
+;;;; 4. export
 (export '(collector-push
           collector-append
           get-collector-list
           with-collector  ;マクロ
           )
         ) ;export
+
+;;;; 5. require
+
+;;;; 6. use-package
+
+;;;; 7. import
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;; 
 ;;;; ■collector
