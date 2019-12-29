@@ -1,18 +1,36 @@
-;;;; require - provide - defpackage - in-package - export
+;;;; 「 Common Lisp 第２版」（共立出版） p245 より
+;;;; 1. provide
+;;;; (1.5. defpackage)
+;;;; 2. in-package
+;;;; 3. shadow
+;;;; 4. export
+;;;; 5. require
+;;;; 6. use-package
+;;;; 7. import
 
-;;; （関数 compile-lhtml で 関数 lhtml:print-parsed-lhtml を呼び出すのに必要）
-(require :lhtml-user)
-;;; 
+;;;; 1. provide
 (provide :lhtml)
-;;; 
+
+;;;; (1.5. defpackage)
 (defpackage :lhtml (:use :lisp :editor))
-;;; 
+
+;;;; 2. in-package
 (in-package :lhtml)
 
-;;; 
+;;;; 3. shadow
+
+;;;; 4. export
 (export '(make-html
 		  )
 		)
+
+;;;; 5. require
+;;; （関数 compile-lhtml で 関数 lhtml:print-parsed-lhtml を呼び出すのに必要）
+(require :lhtml-user)
+
+;;;; 6. use-package
+
+;;;; 7. import
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

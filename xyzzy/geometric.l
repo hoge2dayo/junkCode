@@ -1,16 +1,28 @@
-;;;; require - provide - defpackage - in-package - export
+;;;; 「 Common Lisp 第２版」（共立出版） p245 より
+;;;; 1. provide
+;;;; (1.5. defpackage)
+;;;; 2. in-package
+;;;; 3. shadow
+;;;; 4. export
+;;;; 5. require
+;;;; 6. use-package
+;;;; 7. import
 
-;;(require )
-
+;;;; 1. provide
 (provide :geometric)
 
+;;;; (1.5. defpackage)
 (defpackage :geometric
   (:nicknames :geo)
   (:use :lisp :editor)
   )
 
+;;;; 2. in-package
 (in-package :geometric)
 
+;;;; 3. shadow
+
+;;;; 4. export
 (export '(create-size size-w size-h
 		  size-p
 		  copy-size*
@@ -26,6 +38,12 @@
 		  rect-size or-rect and-rect cut-rect
 		  )
 		) ;export
+
+;;;; 5. require
+
+;;;; 6. use-package
+
+;;;; 7. import
 
 
 ;;;; 

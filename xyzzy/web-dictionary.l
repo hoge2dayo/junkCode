@@ -1,25 +1,42 @@
-;;;; require - provide - defpackage - in-package - export
+;;;; 「 Common Lisp 第２版」（共立出版） p245 より
+;;;; 1. provide
+;;;; (1.5. defpackage)
+;;;; 2. in-package
+;;;; 3. shadow
+;;;; 4. export
+;;;; 5. require
+;;;; 6. use-package
+;;;; 7. import
 
-;;; 
-(require :util-editor)
-(require :util-encode)
-(require :util-regexp)
-(require :dlg)
-;;; 
+;;;; 1. provide
 (provide :web-dictionary)
-;;; 
+
+;;;; (1.5. defpackage)
 (defpackage :web-dictionary
   (:use :lisp :editor)
   (:nicknames :webdic)
   )
-;;; 
+
+;;;; 2. in-package
 (in-package :web-dictionary)
 
-;;; 
+;;;; 3. shadow
+
+;;;; 4. export
 (export '(ej-dic-dialog
 		  open-dic-or-trans
 		  )
 		)
+
+;;;; 5. require
+(require :util-editor)
+(require :util-encode)
+(require :util-regexp)
+(require :dlg)
+
+;;;; 6. use-package
+
+;;;; 7. import
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

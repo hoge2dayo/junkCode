@@ -1,16 +1,35 @@
-;;;; require - provide - defpackage - in-package - export
+;;;; 「 Common Lisp 第２版」（共立出版） p245 より
+;;;; 1. provide
+;;;; (1.5. defpackage)
+;;;; 2. in-package
+;;;; 3. shadow
+;;;; 4. export
+;;;; 5. require
+;;;; 6. use-package
+;;;; 7. import
 
-;;(require )
-
+;;;; 1. provide
 (provide :my-menu)
 
+;;;; (1.5. defpackage)
 (defpackage :my-menu (:use :lisp :editor))
 
+;;;; 2. in-package
 (in-package :my-menu)
 
+;;;; 3. shadow
+
+;;;; 4. export
 (export '(
 		  )
 		) ;export
+
+;;;; 5. require
+
+;;;; 6. use-package
+
+;;;; 7. import
+
 
 ;;;; 
 ;;;; ■メニューバーに［Lisp(L)］追加

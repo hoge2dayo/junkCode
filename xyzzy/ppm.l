@@ -1,13 +1,23 @@
-;;;; require - provide - defpackage - in-package - export
+;;;; 「 Common Lisp 第２版」（共立出版） p245 より
+;;;; 1. provide
+;;;; (1.5. defpackage)
+;;;; 2. in-package
+;;;; 3. shadow
+;;;; 4. export
+;;;; 5. require
+;;;; 6. use-package
+;;;; 7. import
 
-;(require )
-
+;;;; 1. provide
 (provide :ppm)
 
+;;;; (1.5. defpackage)
 (defpackage :ppm (:use :lisp :editor))
 
+;;;; 2. in-package
 (in-package :ppm)
 
+;;;; 4. export
 (export '(8color
 		  clear-img
 		  draw-rect
@@ -19,6 +29,14 @@
 		  )
 		)
 
+;;;; 5. require
+
+;;;; 6. use-package
+
+;;;; 7. import
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; 
 ;;;; ■ppm ファイル（画像）用　描画・ファイル出力機能
 ;;;; 

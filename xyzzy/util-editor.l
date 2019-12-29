@@ -1,17 +1,27 @@
-;;;; require - provide - defpackage - in-package - export
+;;;; 「 Common Lisp 第２版」（共立出版） p245 より
+;;;; 1. provide
+;;;; (1.5. defpackage)
+;;;; 2. in-package
+;;;; 3. shadow
+;;;; 4. export
+;;;; 5. require
+;;;; 6. use-package
+;;;; 7. import
 
-;;; 
-;(require )
-;;; 
+;;;; 1. provide
 (provide :util-editor)
-;;; 
+
+;;;; (1.5. defpackage)
 (defpackage :util-editor (:use :lisp :editor)
   (:nicknames :uedit)
   )
-;;; 
+
+;;;; 2. in-package
 (in-package :util-editor)
 
-;;; 
+;;;; 3. shadow
+
+;;;; 4. export
 (export '(define-key*            ;define-key の不定数登録版
 ;		  with-selected-buffer
 
@@ -36,6 +46,12 @@
 		  with-working-buffer    ;一時的に作業用バッファを作成
 		  )
 		)
+
+;;;; 5. require
+
+;;;; 6. use-package
+
+;;;; 7. import
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

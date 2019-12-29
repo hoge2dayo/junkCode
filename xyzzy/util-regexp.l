@@ -1,23 +1,39 @@
-;;;; require - provide - defpackage - in-package - export
+;;;; 「 Common Lisp 第２版」（共立出版） p245 より
+;;;; 1. provide
+;;;; (1.5. defpackage)
+;;;; 2. in-package
+;;;; 3. shadow
+;;;; 4. export
+;;;; 5. require
+;;;; 6. use-package
+;;;; 7. import
 
-;;; 
-;(require )
-;;; 
+;;;; 1. provide
 (provide :util-regexp)
-;;; 
+
+;;;; (1.5. defpackage)
 (defpackage :util-regexp (:use :lisp :editor)
   (:nicknames :uregexp)
   )
-;;; 
+
+;;;; 2. in-package
 (in-package :util-regexp)
 
-;;; 
+;;;; 3. shadow
+
+;;;; 4. export
 (export '(*html-tag*
 		  combine-regexp          ;正規表現を要素に含むリストを１つの正規表現文字列にする
 		  replace-match-string    ;文字列中の正規表現に合致する箇所を置き換える
 		  remove-match-string     ;文字列中の正規表現に合致する箇所を削除
 		  )
 		)
+
+;;;; 5. require
+
+;;;; 6. use-package
+
+;;;; 7. import
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
