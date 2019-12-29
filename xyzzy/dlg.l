@@ -1,13 +1,25 @@
-;;;; require - provide - defpackage - in-package - export
+;;;; 「 Common Lisp 第２版」（共立出版） p245 より
+;;;; 1. provide
+;;;; (1.5. defpackage)
+;;;; 2. in-package
+;;;; 3. shadow
+;;;; 4. export
+;;;; 5. require
+;;;; 6. use-package
+;;;; 7. import
 
-(require :geometric)
-
+;;;; 1. provide
 (provide :dlg)
 
+;;;; (1.5. defpackage)
 (defpackage :dlg (:use :lisp :editor))
 
+;;;; 2. in-package
 (in-package :dlg)
 
+;;;; 3. shadow
+
+;;;; 4. export
 (export '(create-label
 		  create-button
 		  create-text
@@ -21,8 +33,18 @@
 		  create-edge-layout
 		  display-dialog
 		  sample-dialog
+		  def-layout                ;ダイアログボックス用レイアウト作成（マクロ）
 		  )
 		)
+
+;;;; 5. require
+(require :util)
+(require :geometric)
+
+;;;; 6. use-package
+
+;;;; 7. import
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; 
@@ -137,44 +159,16 @@
 	) ;do
   )
 
-;;; place および 指定した数値の最大値で place を更新
-;;; @param place 汎変数
-;;; @param number 数値
-;;; @param &rest more-numbers 数値（0 個以上）
-;;; @return 
-(defmacro maxf (place number &rest more-numbers)
-  `(setf ,place (max ,place ,number ,@more-numbers))
-  )
-
-;;; place を place および 指定した数値の最小値で更新
-;;; @param place 汎変数
-;;; @param number 数値
-;;; @param &rest more-numbers 数値（0 個以上）
-;;; @return 
-(defmacro minf (place number &rest more-numbers)
-  `(setf ,place (min ,place ,number ,@more-numbers))
-  )
-
-
-;;; 半角文字幅を１、全角文字幅を２とした文字列の幅
-;;; @param s 文字列
-;;; @return 文字列の幅（半角文字を１、全角文字を２とする）
-(defun string-columns (s)
-  (reduce #'(lambda (w ch) (+ w (char-columns ch))) s
-		  :initial-value 0
-		  ) ;reduce
-  )
-
 ;;; 文字列の行数と幅
 ;;; 幅は半角文字を１、全角文字を２とする
 ;;; @param s 文字列
 ;;; @return リスト。第１要素：行数、第２要素：最大幅
 (defun caption-rows-columns (s)
-  (let* ((rows (split-string s #\Linefeed t))
+  (let* ((rows (split-string s #\Newline t))
 		 )
 	(list (length rows)
 		  (reduce #'max
-				  (mapcar #'string-columns rows)
+				  (mapcar #'util:string-columns rows)
 				  :initial-value 0
 				  ) ;reduce
 		  ) ;list
@@ -214,13 +208,13 @@
 	;; height
 	(when height (setf (geo:size-h siz) height)) ;when
 	;; min-width
-	(when min-width (maxf (geo:size-w siz) min-width)) ;when
+	(when min-width (util:maxf (geo:size-w siz) min-width)) ;when
 	;; max-width
-	(when max-width (minf (geo:size-w siz) max-width)) ;when
+	(when max-width (util:minf (geo:size-w siz) max-width)) ;when
 	;; min-height
-	(when min-height (maxf (geo:size-h siz) min-height)) ;when
+	(when min-height (util:maxf (geo:size-h siz) min-height)) ;when
 	;; max-height
-	(when max-height (minf (geo:size-h siz) max-height)) ;when
+	(when max-height (util:minf (geo:size-h siz) max-height)) ;when
 
 	siz
 	) ;let*
@@ -515,7 +509,7 @@
 ;;; @return レイアウトのサイズ
 (defun size-column-layout (obj)
   (reduce #'(lambda (siz siz-elm)
-			  (maxf (geo:size-w siz) (geo:size-w siz-elm))
+			  (util:maxf (geo:size-w siz) (geo:size-w siz-elm))
 			  (incf (geo:size-h siz) (geo:size-h siz-elm))
 			  siz
 			  ) ;lambda
@@ -600,7 +594,7 @@
 (defun size-row-layout (obj)
   (reduce #'(lambda (siz siz-elm)
 			  (incf (geo:size-w siz) (geo:size-w siz-elm))
-			  (maxf (geo:size-h siz) (geo:size-h siz-elm))
+			  (util:maxf (geo:size-h siz) (geo:size-h siz-elm))
 			  siz
 			  ) ;lambda
 		  (mapcar #'size-element (row-layout-lis-elm obj))
@@ -729,12 +723,12 @@
 	(map nil #'(lambda (edge elm &aux (siz (size-element elm)))
 				 (case edge
 				   ((:top :bottom)
-					(maxf w (geo:size-w siz))
+					(util:maxf w (geo:size-w siz))
 					(incf h (geo:size-h siz))
 					)
 				   ((:left :right)
 					(incf w (geo:size-w siz))
-					(maxf h (geo:size-h siz))
+					(util:maxf h (geo:size-h siz))
 					)
 				   (:center
 					(incf w (geo:size-w siz))
@@ -921,6 +915,131 @@
 								   )
 				  )
   )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;; 
+;;;; ■レイアウト作成のマクロ
+;;;; 
+
+;;; キーワード ⇒ 関数シンボル
+;;; @param key
+;;; @return 
+(defun form-name (key)
+  (case key
+	((:label :button :text :edit :check :check3 :combobox :listbox
+	  :column-layout :row-layout :edge-layout)
+	 (intern (format nil "create-~a" key) (find-package :dlg))
+	 )
+	(otherwise key)
+	) ;case
+  )
+
+;;; 引数の扱い方
+;;; @param key
+;;; @return 
+(defun form-arg-type (key)
+  (case key
+	;; 引数は要素のリスト、その後にキーワード引数
+	((:column-layout :row-layout) :arg-type-2)
+	;; 引数は p-list 形式のリスト
+	(:edge-layout :arg-type-3)
+	;; 引数はそのまま（何も編集しない）
+	(otherwise :arg-type-1)
+	) ;case
+  )
+
+;;; （引数はそのまま）
+;;; @param lis 
+;;; @return 
+(defun parse-form-1 (lis)
+  `(,(form-name (car lis)) ,@(cdr lis))
+  )
+
+;;; predicate で始まる要素までとそれ以降にリストを分割
+;;; @param fnc predicate
+;;; @param lis 
+;;; @return ２要素のリスト
+;;; 	第１要素：predicate が偽である要素のリスト
+;;; 	第２要素：predicate が真になる要素以降のリスト
+(defun split-if (fnc lis)
+  (let ((pos (position-if fnc lis))
+		)
+	(if pos
+		(list (subseq lis 0 pos) (subseq lis pos))
+	  (list lis nil)
+	  ) ;if
+	) ;let
+  )
+
+;;; （引数は要素のリスト、その後にキーワード引数）
+;;; @param lis キーワードまでは内部要素と見なす。
+;;; @return 
+(defun parse-form-2 (lis)
+  (let* ((elms-keys (split-if #'keywordp (cdr lis)))
+		 (elms (car elms-keys))
+		 (keys (cadr elms-keys))
+		 )
+	`(,(form-name (car lis))
+	  ,(if elms
+		   `(list ,@(mapcar #'parse-form elms))
+		 nil
+		 )
+	  ,@keys
+	  )
+	) ;let*
+  )
+
+;;; （引数は p-list 形式のリスト）
+;;; @param lis p-list
+;;; @return 
+(defun parse-form-3 (lis)
+  `(,(form-name (car lis))
+	(list ,@(mapcar #'(lambda (e) (if (consp e) (parse-form e) e))
+					(cdr lis)
+					) ;mapcar
+		  ) ;list
+	)
+  )
+
+;;; キーワードで始まるリスト ⇒ コンストラクタ呼び出しのフォーム
+;;; （総称関数）
+;;; @param lis 
+;;; @return 
+(defun parse-form (lis)
+  (case (form-arg-type (car lis))
+	(:arg-type-1 (parse-form-1 lis))
+	(:arg-type-2 (parse-form-2 lis))
+	(:arg-type-3 (parse-form-3 lis))
+	) ;case
+  )
+
+;;; ダイアログ用 layout を作成し、グローバル変数へセット
+;;; （例）
+;;; (def-layout *dialog*
+;;; 			(:column-layout
+;;; 			 (:row-layout
+;;; 			  (:label "ファイル名の先頭：")
+;;; 			  (:text :txt1 :option '(:width 100))
+;;; 			  )
+;;; 			 (:row-layout
+;;; 			  (:button :btn1 "ＯＫ" :option '(:width 40))
+;;; 			  (:button :btn2 "キャンセル" :option '(:width 40))
+;;; 			  )
+;;; 			 )
+;;; 			)
+;;; 
+;;; (dlg:display-dialog nil *dialog* "タイトル"
+;;; 					:initial-value '((:txt1 . "初期テキスト"))
+;;; 					)
+;;; @param var グローバル変数名
+;;; @param lis
+(defmacro def-layout (var lis)
+  `(defparameter ,var ,(parse-form lis))
+  )
+
+;;; lisp-mode でのインデントを、 defun 互換にする。
+(setf (get 'def-layout 'lisp-indent-hook) 'defun)
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; 
