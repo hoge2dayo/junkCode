@@ -220,7 +220,7 @@
           (:value (cond
                    ;; ---- function で始まるリストの場合、そのまま評価する Lisp 式と見なす
                    ((head-eq e 'function)
-                    (push e prefix)  ;出力
+                    (push (cadr e) prefix)  ;出力
                     ;; 二項演算子読取フェーズへ
                     (setf phase :operator)
                     )
